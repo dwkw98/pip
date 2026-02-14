@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>真实比价 - Zeabur部署版</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 真实数据比价</h1>
+            <p class="subtitle">实时抓取Bing Shopping数据 | 完全透明 | Zeabur部署</p>
+        </header>
+
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="输入商品名称（如：iPhone 15, 索尼耳机...）" />
+            <button onclick="search()" id="searchBtn">全网比价</button>
+        </div>
+
+        <div class="filters">
+            <label>
+                <input type="checkbox" id="realOnly" checked> 
+                仅显示真实数据（过滤模拟数据）
+            </label>
+            <span class="status" id="status">就绪</span>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>正在抓取真实数据...</p>
+        </div>
+
+        <div class="results" id="results"></div>
+
+        <footer>
+            <p>🛠️ 技术栈：Node.js + Cheerio + Zeabur | 
+               <a href="https://github.com/yourname/price-comparison" target="_blank">查看源码</a> | 
+               <span class="transparent">完全透明，无隐藏API Key</span>
+            </p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
