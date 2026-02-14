@@ -1,117 +1,257 @@
-// API基础URL（自动检测环境）
-const API_BASE = window.location.origin;
-
-// 搜索功能
-async function search() {
-    const keyword = document.getElementById('searchInput').value.trim();
-    if (!keyword) {
-        alert('请输入搜索关键词');
-        return;
-    }
-
-    const btn = document.getElementById('searchBtn');
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const status = document.getElementById('status');
-
-    // UI状态更新
-    btn.disabled = true;
-    btn.textContent = '搜索中...';
-    loading.style.display = 'block';
-    results.innerHTML = '';
-    status.textContent = '正在抓取Bing Shopping...';
-
-    try {
-        const response = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(keyword)}`);
-        const data = await response.json();
-
-        if (data.success) {
-            displayResults(data.results);
-            status.textContent = `找到 ${data.count} 个结果 | 数据来源: Bing Shopping`;
-        } else {
-            throw new Error(data.error || '搜索失败');
-        }
-    } catch (error) {
-        console.error('搜索错误:', error);
-        results.innerHTML = `
-            <div class="empty-state">
-                <h2>⚠️ 获取数据失败</h2>
-                <p>${error.message}</p>
-                <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
-                    提示：由于Bing Shopping有反爬机制，偶尔可能会失败，请稍后重试
-                </p>
-            </div>
-        `;
-        status.textContent = '获取失败';
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '全网比价';
-        loading.style.display = 'none';
-    }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-// 显示结果
-function displayResults(products) {
-    const container = document.getElementById('results');
-    const realOnly = document.getElementById('realOnly').checked;
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+header {
+    text-align: center;
+    color: white;
+    margin-bottom: 40px;
+}
+
+h1 {
+    font-size: 3em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.subtitle {
+    font-size: 1.1em;
+    opacity: 0.9;
+}
+
+.search-box {
+    display: flex;
+    gap: 10px;
+    max-width: 700px;
+    margin: 0 auto 20px;
+    background: white;
+    padding: 5px;
+    border-radius: 50px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+
+#searchInput {
+    flex: 1;
+    border: none;
+    padding: 15px 25px;
+    font-size: 16px;
+    outline: none;
+    background: transparent;
+}
+
+#searchBtn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+#searchBtn:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+.filters {
+    max-width: 700px;
+    margin: 0 auto 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+    font-size: 14px;
+}
+
+.filters label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.status {
+    background: rgba(255,255,255,0.2);
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+
+.loading {
+    text-align: center;
+    color: white;
+    padding: 40px;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.results {
+    display: grid;
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.product-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 100px 1fr auto;
+    gap: 20px;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+
+.product-card.mock-data::before {
+    content: "模拟数据";
+    position: absolute;
+    top: 10px;
+    right: -30px;
+    background: #ff6b6b;
+    color: white;
+    padding: 2px 30px;
+    font-size: 10px;
+    transform: rotate(45deg);
+}
+
+.product-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 10px;
+    background: #f0f0f0;
+}
+
+.product-info h3 {
+    font-size: 1.2em;
+    margin-bottom: 8px;
+    color: #2d3748;
+}
+
+.merchant {
+    color: #718096;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+
+.platform {
+    display: inline-block;
+    background: #edf2f7;
+    color: #4a5568;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+}
+
+.product-price {
+    text-align: right;
+}
+
+.price {
+    font-size: 1.8em;
+    color: #e53e3e;
+    font-weight: bold;
+}
+
+.buy-btn {
+    display: inline-block;
+    margin-top: 10px;
+    background: #48bb78;
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 0.9em;
+    transition: background 0.2s;
+}
+
+.buy-btn:hover {
+    background: #38a169;
+}
+
+.empty-state {
+    text-align: center;
+    color: white;
+    padding: 60px 20px;
+}
+
+.empty-state h2 {
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+footer {
+    text-align: center;
+    color: white;
+    margin-top: 60px;
+    padding: 20px;
+    opacity: 0.8;
+    font-size: 0.9em;
+}
+
+footer a {
+    color: #ffd700;
+    text-decoration: none;
+}
+
+.transparent {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+@media (max-width: 768px) {
+    .product-card {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
     
-    // 过滤模拟数据（如果勾选）
-    const filtered = realOnly ? products.filter(p => !p.isMock) : products;
-    
-    if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <h2>😕 暂无结果</h2>
-                <p>尝试更换关键词或取消"仅显示真实数据"筛选</p>
-            </div>
-        `;
-        return;
+    .product-image {
+        margin: 0 auto;
     }
-
-    container.innerHTML = filtered.map(product => `
-        <div class="product-card ${product.isMock ? 'mock-data' : ''}">
-            <img src="${product.image || 'https://via.placeholder.com/100?text=No+Image'}" 
-                 alt="${product.title}" 
-                 class="product-image"
-                 onerror="this.src='https://via.placeholder.com/100?text=No+Image'">
-            
-            <div class="product-info">
-                <h3>${escapeHtml(product.title)}</h3>
-                <div class="merchant">🏪 ${escapeHtml(product.merchant)}</div>
-                <span class="platform">${escapeHtml(product.platform)}</span>
-                ${product.isMock ? '<span style="color: #ff6b6b; font-size: 0.8em; margin-left: 10px;">⚠️ 演示数据</span>' : ''}
-            </div>
-            
-            <div class="product-price">
-                <div class="price">${product.price}</div>
-                <a href="${product.link}" target="_blank" class="buy-btn">查看详情</a>
-                <div style="font-size: 0.7em; color: #999; margin-top: 5px;">
-                    ${new Date(product.updatedAt).toLocaleString()}
-                </div>
-            </div>
-        </div>
-    `).join('');
+    
+    .product-price {
+        text-align: center;
+    }
 }
-
-// HTML转义防止XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// 回车搜索
-document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') search();
-});
-
-// 筛选变化时重新渲染
-document.getElementById('realOnly')?.addEventListener('change', () => {
-    const keyword = document.getElementById('searchInput').value.trim();
-    if (keyword) search();
-});
-
-// 页面加载完成提示
-console.log('🚀 真实数据比价网站已加载');
-console.log('📊 数据来源：Bing Shopping实时爬取');
-console.log('🔍 完全透明，所有代码可见');
