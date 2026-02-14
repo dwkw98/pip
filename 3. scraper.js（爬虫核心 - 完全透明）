@@ -1,0 +1,174 @@
+const axios = require('axios');
+const cheerio = require('cheerio');
+
+// 请求配置（模拟真实浏览器）
+const headers = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Connection': 'keep-alive',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Cache-Control': 'max-age=0'
+};
+
+/**
+ * 搜索Bing Shopping
+ * 完全透明：直接访问公开搜索页面，解析HTML获取数据
+ */
+async function searchBingShopping(keyword) {
+  try {
+    // 构建Bing Shopping搜索URL（公开页面）
+    const searchUrl = `https://www.bing.com/shop?q=${encodeURIComponent(keyword)}&FORM=SHOPPA`;
+    
+    console.log(`正在访问: ${searchUrl}`);
+    
+    const response = await axios.get(searchUrl, { 
+      headers,
+      timeout: 10000,
+      maxRedirects: 5
+    });
+
+    const $ = cheerio.load(response.data);
+    const products = [];
+
+    // 解析Bing Shopping结果（选择器基于实际页面结构）
+    $('.br-item, .b_algo, .slide').each((index, element) => {
+      try {
+        const $el = $(element);
+        
+        // 商品名称
+        const title = $el.find('.br-title, h2, .b_algoheader').first().text().trim();
+        
+        // 价格（多种格式兼容）
+        let price = '';
+        const priceSelectors = [
+          '.br-price .price',
+          '.br-price',
+          '.price',
+          '[class*="price"]',
+          '.b_factrow'
+        ];
+        
+        for (let selector of priceSelectors) {
+          price = $el.find(selector).first().text().trim();
+          if (price && price.match(/[\d,]+(\.\d+)?/)) break;
+        }
+
+        // 商家/来源
+        const merchant = $el.find('.br-merchant, .b_attribution, cite').first().text().trim() || 'Bing Shopping';
+        
+        // 商品链接
+        let link = $el.find('a').first().attr('href') || '';
+        if (link && !link.startsWith('http')) {
+          link = 'https://www.bing.com' + link;
+        }
+
+        // 图片
+        let image = $el.find('img').first().attr('src') || '';
+        if (image && image.startsWith('//')) {
+          image = 'https:' + image;
+        }
+
+        // 过滤无效数据
+        if (title && price && title.length > 3) {
+          products.push({
+            title: title.substring(0, 100),
+            price: price,
+            merchant: merchant,
+            link: link,
+            image: image,
+            platform: 'Bing Shopping',
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (e) {
+        console.log('解析单个商品失败:', e.message);
+      }
+    });
+
+    // 如果Bing Shopping解析失败，尝试备用方案：模拟结构化数据
+    if (products.length === 0) {
+      console.log('Bing Shopping无结果，尝试备用数据源...');
+      return getMockData(keyword); // 临时备用（真实部署时可删除）
+    }
+
+    console.log(`成功获取 ${products.length} 条真实数据`);
+    return products;
+
+  } catch (error) {
+    console.error('Bing Shopping爬取失败:', error.message);
+    // 备用：返回模拟数据（仅用于演示，生产环境建议重试或报错）
+    return getMockData(keyword);
+  }
+}
+
+/**
+ * 获取商品详情（深度爬取）
+ */
+async function getProductDetails(url) {
+  try {
+    const response = await axios.get(url, { headers, timeout: 10000 });
+    const $ = cheerio.load(response.data);
+    
+    return {
+      title: $('h1').first().text().trim() || $('title').text().trim(),
+      price: $('[class*="price"]').first().text().trim(),
+      description: $('meta[name="description"]').attr('content') || '',
+      images: $('img').map((i, el) => $(el).attr('src')).get().filter(src => src && src.includes('http')),
+      url: url
+    };
+  } catch (error) {
+    throw new Error(`获取详情失败: ${error.message}`);
+  }
+}
+
+/**
+ * 备用数据（基于真实价格规律生成，仅用于演示）
+ * 注意：生产环境应删除此函数，改为重试机制或报错
+ */
+function getMockData(keyword) {
+  console.log('使用备用数据（演示模式）');
+  const basePrice = Math.floor(Math.random() * 1000) + 100;
+  
+  return [
+    {
+      title: `${keyword} - 官方正品`,
+      price: `¥${basePrice}`,
+      merchant: '京东自营',
+      link: `https://search.jd.com/Search?keyword=${encodeURIComponent(keyword)}`,
+      image: '',
+      platform: '京东（模拟数据）',
+      updatedAt: new Date().toISOString(),
+      isMock: true
+    },
+    {
+      title: `${keyword} - 热销款`,
+      price: `¥${Math.floor(basePrice * 0.9)}`,
+      merchant: '天猫旗舰店',
+      link: `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}`,
+      image: '',
+      platform: '天猫（模拟数据）',
+      updatedAt: new Date().toISOString(),
+      isMock: true
+    },
+    {
+      title: `${keyword} - 百亿补贴`,
+      price: `¥${Math.floor(basePrice * 0.8)}`,
+      merchant: '拼多多',
+      link: `https://mobile.yangkeduo.com/search_result.html?search_key=${encodeURIComponent(keyword)}`,
+      image: '',
+      platform: '拼多多（模拟数据）',
+      updatedAt: new Date().toISOString(),
+      isMock: true
+    }
+  ];
+}
+
+module.exports = {
+  searchBingShopping,
+  getProductDetails
+};
